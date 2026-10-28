@@ -1,60 +1,60 @@
 <?php
 
-namespace CoffeeCode\Router;
+declare(strict_types=1);
+
+namespace BrWay;
 
 /**
- * Class CoffeeCode Dispatch
- *
- * @author Robson V. Leite <https://github.com/robsonvleite>
- * @package CoffeeCode\Router
+ * Class Dispatch
+ * @package BrWay
  */
 abstract class Dispatch
 {
     use RouterTrait;
 
-    /** @var string */
+    /** @var string URL base do projeto, sem barra no final */
     protected string $projectUrl;
 
-    /** @var string */
+    /** @var string verbo da requisição (já com o spoofing aplicado) */
     protected string $httpMethod;
 
-    /** @var string */
+    /** @var string caminho requisitado, ex.: "/admin/user/5" ("" na raiz) */
     protected string $path;
 
-    /** @var array|null */
+    /** @var array|null rota encontrada pelo dispatch() */
     protected ?array $route = null;
 
-    /** @var array */
-    protected array $routes;
+    /** @var array rotas por verbo: [verbo => [regex => rota]] */
+    protected array $routes = [];
 
-    /** @var string */
+    /** @var string separador de "Controller:method" */
     protected string $separator;
 
-    /** @var string|null */
+    /** @var string|null namespace dos controllers das próximas rotas */
     protected ?string $namespace = null;
 
-    /** @var string|null */
+    /** @var string|null grupo (prefixo) das próximas rotas */
     protected ?string $group = null;
 
-    /** @var array|null */
-    protected ?array $middleware = null;
+    /** @var array middlewares do grupo atual */
+    protected array $middleware = [];
 
-    /** @var array|null */
+    /** @var array|null dados da requisição; depois do dispatch(), os da rota encontrada */
     protected ?array $data = null;
 
-    /** @var int */
+    /** @var int|null */
     protected ?int $error = null;
 
     /** @const int Bad Request */
     public const BAD_REQUEST = 400;
 
-    /** @const int Not Found */
+    /** @const int Not Found: nenhuma rota para o caminho */
     public const NOT_FOUND = 404;
 
-    /** @const int Method Not Allowed */
+    /** @const int Method Not Allowed: o caminho existe, mas em outro verbo */
     public const METHOD_NOT_ALLOWED = 405;
 
-    /** @const int Not Implemented */
+    /** @const int Not Implemented: sem rotas, ou controller/método/middleware inexistente */
     public const NOT_IMPLEMENTED = 501;
 
     /**
@@ -65,30 +65,33 @@ abstract class Dispatch
      */
     public function __construct(string $projectUrl, ?string $separator = ":")
     {
-        $this->projectUrl = (substr($projectUrl, "-1") == "/" ? substr($projectUrl, 0, -1) : $projectUrl);
-        $this->path = rtrim((filter_input(INPUT_GET, "route", FILTER_DEFAULT) ?? "/"), "/");
-        $this->separator = ($separator ?? ":");
-        $this->httpMethod = $_SERVER['REQUEST_METHOD'];
+        $this->projectUrl = rtrim($projectUrl, "/");
+        $this->separator = ($separator ?: ":");
+        $this->path = $this->requestPath();
+        $this->httpMethod = strtoupper((string)($_SERVER["REQUEST_METHOD"] ?? "GET"));
+        $this->formSpoofing();
     }
 
     /**
      * @return array
      */
-    public function __debugInfo()
+    public function __debugInfo(): array
     {
         return $this->routes;
     }
 
     /**
+     * URL de uma rota nomeada. Valores que não são parâmetros da rota vão para a query string.
+     *
      * @param string $name
      * @param array|null $data
      * @return string|null
      */
-    public function route(string $name, array $data = null): ?string
+    public function route(string $name, ?array $data = null): ?string
     {
         foreach ($this->routes as $http_verb) {
             foreach ($http_verb as $route_item) {
-                if (!empty($route_item["name"]) && $route_item["name"] == $name) {
+                if ($route_item["name"] !== null && $route_item["name"] === $name) {
                     return $this->treat($route_item, $data);
                 }
             }
@@ -98,22 +101,23 @@ abstract class Dispatch
 
     /**
      * @param null|string $namespace
-     * @return Dispatch
+     * @return static
      */
-    public function namespace(?string $namespace): Dispatch
+    public function namespace(?string $namespace): static
     {
-        $this->namespace = ($namespace ? ucwords($namespace) : null);
+        $this->namespace = ($namespace ? ucwords(trim($namespace, "\\")) : null);
         return $this;
     }
 
     /**
      * @param null|string $group
-     * @return Dispatch
+     * @param array|string|null $middleware rodam antes dos middlewares de cada rota do grupo
+     * @return static
      */
-    public function group(?string $group, array|string $middleware = null): Dispatch
+    public function group(?string $group, array|string|null $middleware = null): static
     {
-        $this->group = ($group ? trim($group, "/") : null);
-        $this->middleware = $middleware ? [$this->group => $middleware] : null;
+        $this->group = (trim((string)$group, "/") ?: null);
+        $this->middleware = (array)$middleware;
         return $this;
     }
 
@@ -126,9 +130,9 @@ abstract class Dispatch
     }
 
     /**
-     * @return object|null
+     * @return object
      */
-    public function current(): ?object
+    public function current(): object
     {
         return (object)array_merge(
             [
@@ -149,10 +153,13 @@ abstract class Dispatch
     }
 
     /**
+     * Redireciona para uma rota nomeada, uma URL completa ou um caminho do projeto.
+     * Não passe dados do usuário em $route: uma URL completa é seguida como está.
+     *
      * @param string $route
      * @param array|null $data
      */
-    public function redirect(string $route, array $data = null): void
+    public function redirect(string $route, ?array $data = null): never
     {
         if ($name = $this->route($route, $data)) {
             header("Location: {$name}");
@@ -164,7 +171,7 @@ abstract class Dispatch
             exit;
         }
 
-        $route = (substr($route, 0, 1) == "/" ? $route : "/{$route}");
+        $route = "/" . ltrim($route, "/");
         header("Location: {$this->projectUrl}{$route}");
         exit;
     }
@@ -182,18 +189,39 @@ abstract class Dispatch
      */
     public function dispatch(): bool
     {
-        if (empty($this->routes) || empty($this->routes[$this->httpMethod])) {
+        $this->route = null;
+        $this->error = null;
+
+        if (empty($this->routes)) {
             $this->error = self::NOT_IMPLEMENTED;
             return false;
         }
 
-        $this->route = null;
-        foreach ($this->routes[$this->httpMethod] as $key => $route) {
-            if (preg_match("~^" . $key . "$~", $this->path, $found)) {
-                $this->route = $route;
-            }
+        $routes = $this->routes[$this->httpMethod] ?? [];
+        if ($this->httpMethod === "HEAD" && empty($routes)) {
+            $routes = $this->routes["GET"] ?? [];
         }
 
+        $this->route = $this->match($routes);
+        if (!$this->route) {
+            $this->error = ($this->matchesAnotherMethod() ? self::METHOD_NOT_ALLOWED : self::NOT_FOUND);
+            return false;
+        }
+
+        $this->data = $this->route["data"];
         return $this->execute();
+    }
+
+    /**
+     * @return bool
+     */
+    private function matchesAnotherMethod(): bool
+    {
+        foreach ($this->routes as $routes) {
+            if ($this->match($routes)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
