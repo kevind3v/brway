@@ -83,13 +83,16 @@ $router->patch("/user/{id}/photo", "User:photo");
 $router->delete("/user/{id}", [User::class, "destroy"]); // array também funciona
 
 // grupo: /admin, /admin/user/{id}
-$router->group("admin")->namespace("App\Admin");
-$router->get("/", "Dash:home");
-$router->get("/user/{id}", "Dash:user");
+$router->group("admin", function () {
+    $this->namespace("App\Admin");
+    $this->get("/", "Dash:home");
+    $this->get("/user/{id}", "Dash:user");
+});
 
 // grupo de erros: 400, 404, 405 e 501
-$router->group("error")->namespace("App\Controllers");
-$router->get("/{errcode}", "Web:error");
+$router->group("error", function () {
+    $this->get("/{errcode}", "Web:error");
+});
 
 $router->dispatch();
 
@@ -102,8 +105,35 @@ if ($router->error()) {
   têm o mesmo número de parâmetros, vence a registrada primeiro.
 - **O caminho é comparado literalmente**: o `.` de `/feed.xml` é um ponto, não "qualquer caractere".
 - **Parâmetros** (`{id}`) casam com um segmento inteiro, sem `/` e sem caracteres de controle (`%00`, `%0A`).
-- `group(null)` e `namespace(null)` limpam o grupo e o namespace.
+- `namespace(null)` limpa o namespace.
 - Requisições HEAD usam as rotas GET.
+
+### Grupos
+
+As rotas registradas dentro da função ficam no grupo. Dentro dela, `$this` é o router. No fim, o grupo, os
+middlewares e o namespace voltam ao que eram antes:
+
+```php
+$router->group("admin", function () {
+    $this->get("/", "Admin:home");               // /admin
+    $this->get("/user/{id}", "Admin:user");      // /admin/user/{id}
+
+    // grupo dentro de grupo: /admin/report/{year}
+    $this->group("report", function () {
+        $this->get("/{year}", "Report:year");
+    });
+});
+
+$router->get("/contato", "Web:contact");         // fora do grupo
+```
+
+Se preferir receber o router no parâmetro (útil para o autocomplete do editor), também funciona:
+`function (Router $router) { $router->get(...); }`. Uma `static function` ou um método (`$this->rotas(...)`)
+recebem o router só pelo parâmetro.
+
+O formato sem função também continua valendo: `$router->group("admin")` seguido das rotas. Nele, o grupo vale
+até o próximo `group()`, e `group(null)` volta para fora do grupo. Um grupo com função fecha o grupo aberto sem
+função antes dele, então os dois formatos podem ser usados no mesmo arquivo.
 
 ### Controller
 
@@ -220,13 +250,23 @@ class Auth
 $router->get("/perfil", "User:profile", middleware: Auth::class);
 $router->get("/painel", "User:panel", "user.panel", [Auth::class, Verified::class]);
 
-// no grupo: roda antes dos middlewares de cada rota do grupo
+// no grupo (3º parâmetro): roda antes dos middlewares de cada rota do grupo
+$router->group("admin", function () {
+    $this->get("/", "Admin:home");                                // Auth
+    $this->post("/user", "Admin:store", middleware: Csrf::class); // Auth, depois Csrf
+
+    $this->group("finance", function () {
+        $this->get("/", "Finance:home");                          // Auth, depois Admin
+    }, Admin::class);
+}, Auth::class);
+
+// formato sem função: o middleware é o 2º parâmetro e vale até o próximo group()
 $router->group("admin", Auth::class);
-$router->get("/", "Admin:home");                              // Auth
-$router->post("/user", "Admin:store", middleware: Csrf::class); // Auth, depois Csrf
+$router->get("/", "Admin:home");                                  // Auth
 ```
 
-O middleware do grupo vale até o próximo `group()`.
+Num grupo dentro de grupo, os middlewares somam: primeiro os do grupo de fora, depois os do de dentro e por
+último os da rota.
 
 ## Erros
 

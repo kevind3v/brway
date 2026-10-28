@@ -39,6 +39,9 @@ abstract class Dispatch
     /** @var array middlewares do grupo atual */
     protected array $middleware = [];
 
+    /** @var int quantas funções de group() estão rodando (0 = fora de qualquer grupo com função) */
+    private int $depth = 0;
+
     /** @var array|null dados da requisição; depois do dispatch(), os da rota encontrada */
     protected ?array $data = null;
 
@@ -110,15 +113,63 @@ abstract class Dispatch
     }
 
     /**
+     * Com $routes, as rotas registradas na função ficam no grupo. Dentro de outra função de grupo, ele soma
+     * com o grupo de fora e, no fim, o grupo e os middlewares voltam ao que eram. Fora, ele fecha o grupo
+     * aberto sem função e, no fim, nenhum grupo fica aberto. O namespace sempre volta ao que era.
+     * Sem $routes, o grupo vale até o próximo group().
+     *
      * @param null|string $group
+     * @param \Closure|array|string|null $routes função com as rotas do grupo, ou os middlewares (formato sem função)
      * @param array|string|null $middleware rodam antes dos middlewares de cada rota do grupo
      * @return static
      */
-    public function group(?string $group, array|string|null $middleware = null): static
-    {
-        $this->group = (trim((string)$group, "/") ?: null);
-        $this->middleware = (array)$middleware;
+    public function group(
+        ?string $group,
+        \Closure|array|string|null $routes = null,
+        array|string|null $middleware = null
+    ): static {
+        $group = trim((string)$group, "/");
+
+        if (!$routes instanceof \Closure) {
+            $this->group = ($group ?: null);
+            $this->middleware = (array)($routes ?? $middleware);
+            return $this;
+        }
+
+        if ($this->depth === 0) {
+            $this->group = null;
+            $this->middleware = [];
+        }
+
+        $previous = [$this->group, $this->middleware, $this->namespace];
+
+        $this->group = (implode("/", array_filter([$this->group, $group])) ?: null);
+        $this->middleware = array_values(array_unique(array_merge($this->middleware, (array)$middleware)));
+
+        $this->depth++;
+        try {
+            $this->bind($routes)($this);
+        } finally {
+            $this->depth--;
+            [$this->group, $this->middleware, $this->namespace] = $previous;
+        }
         return $this;
+    }
+
+    /**
+     * Dentro da função do grupo, $this é o router, mesmo quando ela foi criada dentro de uma classe.
+     * Funções static e métodos ($obj->metodo(...)) não são alterados: usam o router recebido no parâmetro.
+     *
+     * @param \Closure $routes
+     * @return \Closure
+     */
+    private function bind(\Closure $routes): \Closure
+    {
+        $function = new \ReflectionFunction($routes);
+        if ($function->isStatic() || !str_starts_with($function->getName(), "{closure")) {
+            return $routes;
+        }
+        return ($routes->bindTo($this) ?? $routes);
     }
 
     /**

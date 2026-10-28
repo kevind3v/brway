@@ -43,50 +43,44 @@ $router->get("/negado", "Coffee:denied", "coffe.denied", Middleware::USER);
 /**
  * group by routes and namespace
  */
-$router->group("admin", \Http\Group::class);
-
-$router->get("/", "Coffee:admin");
-$router->get("/user/{id}", "Coffee:admin");
-$router->get("/user/{id}/profile", "Coffee:admin", middleware: \Http\Guest::class);
-$router->get("/user/{id}/profile/{photo}", "Coffee:admin");
+$router->group("admin", function () {
+    $this->get("/", "Coffee:admin");
+    $this->get("/user/{id}", "Coffee:admin");
+    $this->get("/user/{id}/profile", "Coffee:admin", middleware: \Http\Guest::class);
+    $this->get("/user/{id}/profile/{photo}", "Coffee:admin");
+}, \Http\Group::class);
 
 /**
  * named routes and middlewares
  */
-$router->group("name");
-
-$router->get("/", "Name:home", "name.home");
-$router->get("/hello", "Name:hello", "name.hello", \Http\Guest::class);
-$router->get("/params/{category}/page/{page}", "name:params", "name.params");
-$router->get("/redirect", "Name:redirect", "name.redirect", Middleware::GUEST);
-$router->get("/redirect/{category}/{page}", "name:redirect", "name.redirect.params");
+$router->group("name", function () {
+    $this->get("/", "Name:home", "name.home");
+    $this->get("/hello", "Name:hello", "name.hello", \Http\Guest::class);
+    $this->get("/params/{category}/page/{page}", "name:params", "name.params");
+    $this->get("/redirect", "Name:redirect", "name.redirect", Middleware::GUEST);
+    $this->get("/redirect/{category}/{page}", "name:redirect", "name.redirect.params");
+});
 
 /**
  * call route and group middleware
  */
-$router->group("call", Middleware::GUEST);
-$router->get(
-    "/",
-    function ($data, Router $route) {
+$router->group("call", function () {
+    $show = function ($data, Router $route) {
         echo "<pre>", htmlspecialchars(print_r([$data, $route->current()], true)), "</pre>";
 
         echo "<a href='{$route->home()}' title='voltar'>voltar</a>";
-    }
-);
-$router->get(
-    "/{app}/",
-    function ($data, Router $route) {
-        echo "<pre>", htmlspecialchars(print_r([$data, $route->current()], true)), "</pre>";
+    };
 
-        echo "<a href='{$route->home()}' title='voltar'>voltar</a>";
-    }
-);
+    $this->get("/", $show);
+    $this->get("/{app}/", $show);
+}, Middleware::GUEST);
 
 /**
  * Group Error
  */
-$router->namespace("Test")->group("error");
-$router->get("/{errcode}", "Coffee:notFound");
+$router->group("error", function () {
+    $this->get("/{errcode}", "Coffee:notFound");
+});
 
 /**
  * execute
