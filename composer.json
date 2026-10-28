@@ -1,28 +1,43 @@
 {
-  "name": "coffeecode/router",
-  "description": "A classic CoffeeCode Router is easy, fast and extremely uncomplicated. Create and manage your routes in minutes!",
+  "name": "brbunny/brway",
+  "description": "Roteador PHP simples para MVC e APIs: verbos RESTful, grupos, rotas nomeadas, middlewares e form spoofing.",
   "keywords": [
-    "CoffeeCode",
-    "UpInside",
+    "BrWay",
     "Router",
     "Route",
-    "Routes"
+    "Routes",
+    "Middleware",
+    "MVC"
   ],
-  "homepage": "http://www.upinside.com.br",
   "license": "MIT",
   "authors": [
     {
+      "name": "Kevin Siqueira",
+      "role": "Maintainer"
+    },
+    {
       "name": "Robson V. Leite",
       "email": "cursos@upinside.com.br",
-      "role": "Developer"
+      "role": "Original author (CoffeeCode Router)"
     }
   ],
   "require": {
-    "php": ">=8.0"
+    "php": ">=8.2"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.5"
   },
   "autoload": {
     "psr-4": {
-      "CoffeeCode\\Router\\": "src"
+      "BrWay\\": "src"
     }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "BrWay\\Tests\\": "tests"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
   }
 }

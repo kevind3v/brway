@@ -1,0 +1,7 @@
+/vendor/
+composer.lock
+.phpunit.cache/
+.playwright-cli/
+.phpunit.result.cache
+.idea/
+/docker/
