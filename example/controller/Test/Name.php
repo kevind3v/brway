@@ -2,7 +2,7 @@
 
 namespace Test;
 
-use CoffeeCode\Router\Router;
+use BrWay\Router;
 
 class Name
 {
@@ -40,7 +40,7 @@ class Name
     public function params(array $data): void
     {
         echo "<h3>Params</h3>";
-        var_dump($data, $this->router->current());
+        echo "<pre>", htmlspecialchars(print_r([$data, $this->router->current()], true)), "</pre>";
     }
 
     public function redirect(array $data): void

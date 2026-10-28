@@ -1,5 +1,11 @@
 <?php
 
+/*
+ * Os controllers e middlewares do exemplo imprimem antes de redirecionar: o buffer
+ * segura a saída para o header("Location") ainda funcionar.
+ */
+ob_start();
+
 require dirname(__DIR__, 2) . "/vendor/autoload.php";
 require __DIR__ . "/Test/Coffee.php";
 require __DIR__ . "/Test/Name.php";
@@ -12,10 +18,15 @@ require __DIR__ . "/Http/Guest.php";
 require __DIR__ . "/Http/User.php";
 require __DIR__ . "/Http/Group.php";
 
-use CoffeeCode\Router\Router;
+use BrWay\Router;
 use Http\Middlewares as Middleware;
 
-const BASE = "https://www.localhost/coffeecode/router/exemple/controller";
+/*
+ * URL do exemplo. O Host enviado pelo cliente só é aceito se for localhost (qualquer porta),
+ * para o exemplo rodar local sem permitir redirect para outro site. Em produção, use a URL fixa.
+ */
+$host = (preg_match("~^(localhost|127\.0\.0\.1)(:\d+)?$~", $_SERVER["HTTP_HOST"] ?? "") ? $_SERVER["HTTP_HOST"] : "localhost");
+define("BASE", "http://{$host}" . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/"));
 $router = new Router(BASE);
 
 /**
@@ -36,7 +47,7 @@ $router->group("admin", \Http\Group::class);
 
 $router->get("/", "Coffee:admin");
 $router->get("/user/{id}", "Coffee:admin");
-$router->get("/user/{id}/profile", "Coffee:admin", \Http\Guest::class);
+$router->get("/user/{id}/profile", "Coffee:admin", middleware: \Http\Guest::class);
 $router->get("/user/{id}/profile/{photo}", "Coffee:admin");
 
 /**
@@ -57,7 +68,7 @@ $router->group("call", Middleware::GUEST);
 $router->get(
     "/",
     function ($data, Router $route) {
-        var_dump($data, $route->current());
+        echo "<pre>", htmlspecialchars(print_r([$data, $route->current()], true)), "</pre>";
 
         echo "<a href='{$route->home()}' title='voltar'>voltar</a>";
     }
@@ -65,7 +76,7 @@ $router->get(
 $router->get(
     "/{app}/",
     function ($data, Router $route) {
-        var_dump($data, $route->current());
+        echo "<pre>", htmlspecialchars(print_r([$data, $route->current()], true)), "</pre>";
 
         echo "<a href='{$route->home()}' title='voltar'>voltar</a>";
     }

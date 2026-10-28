@@ -2,9 +2,14 @@
 
 require dirname(__DIR__, 2) . "/vendor/autoload.php";
 
-use CoffeeCode\Router\Router;
+use BrWay\Router;
 
-define("BASE", "https://www.localhost/coffeecode/router/exemple/controller");
+/*
+ * URL do exemplo. O Host enviado pelo cliente só é aceito se for localhost (qualquer porta),
+ * para o exemplo rodar local sem permitir redirect para outro site. Em produção, use a URL fixa.
+ */
+$host = (preg_match("~^(localhost|127\.0\.0\.1)(:\d+)?$~", $_SERVER["HTTP_HOST"] ?? "") ? $_SERVER["HTTP_HOST"] : "localhost");
+define("BASE", "http://{$host}" . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/"));
 $router = new Router(BASE);
 
 /**
@@ -14,7 +19,7 @@ $router->get(
     "/",
     function ($data) {
         $data = ["realHttp" => $_SERVER["REQUEST_METHOD"]] + $data;
-        echo "<h1>GET :: Spoofing</h1>", "<pre>", print_r($data, true), "</pre>";
+        echo "<h1>GET :: Spoofing</h1>", "<pre>", htmlspecialchars(print_r($data, true)), "</pre>";
     }
 );
 
@@ -25,7 +30,7 @@ $router->post(
     "/",
     function ($data) {
         $data = ["realHttp" => $_SERVER["REQUEST_METHOD"]] + $data;
-        echo "<h1>POST :: Spoofing</h1>", "<pre>", print_r($data, true), "</pre>";
+        echo "<h1>POST :: Spoofing</h1>", "<pre>", htmlspecialchars(print_r($data, true)), "</pre>";
     }
 );
 
@@ -36,7 +41,7 @@ $router->put(
     "/",
     function ($data) {
         $data = ["realHttp" => $_SERVER["REQUEST_METHOD"]] + $data;
-        echo "<h1>PUT :: Spoofing</h1>", "<pre>", print_r($data, true), "</pre>";
+        echo "<h1>PUT :: Spoofing</h1>", "<pre>", htmlspecialchars(print_r($data, true)), "</pre>";
     }
 );
 
@@ -47,7 +52,7 @@ $router->patch(
     "/",
     function ($data) {
         $data = ["realHttp" => $_SERVER["REQUEST_METHOD"]] + $data;
-        echo "<h1>PATCH :: Spoofing</h1>", "<pre>", print_r($data, true), "</pre>";
+        echo "<h1>PATCH :: Spoofing</h1>", "<pre>", htmlspecialchars(print_r($data, true)), "</pre>";
     }
 );
 
@@ -58,7 +63,7 @@ $router->delete(
     "/",
     function ($data) {
         $data = ["realHttp" => $_SERVER["REQUEST_METHOD"]] + $data;
-        echo "<h1>DELETE :: Spoofing</h1>", "<pre>", print_r($data, true), "</pre>";
+        echo "<h1>DELETE :: Spoofing</h1>", "<pre>", htmlspecialchars(print_r($data, true)), "</pre>";
     }
 );
 
@@ -77,5 +82,5 @@ $router->dispatch();
     <input type="text" name="last_name" value="Leite"/>
     <input type="text" name="email" value="cursos@upinside.com.br"/>
 
-    <button>CoffeeCode</button>
+    <button>BrWay</button>
 </form>

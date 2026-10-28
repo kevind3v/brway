@@ -2,7 +2,7 @@
 
 namespace Http;
 
-use CoffeeCode\Router\Router;
+use BrWay\Router;
 
 class User
 {
